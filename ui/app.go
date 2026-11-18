@@ -256,13 +256,16 @@ func phaseLabel(snap snapshot) string {
 	return "Отключено"
 }
 
+// serverLine names the server the tunnel really uses, then the approximate exit: the address is
+// what a support request needs, the city only says where traffic leaves Cloudflare.
 func serverLine(snap snapshot) string {
 	parts := []string{}
-	if snap.status.Exit.Colo != "" {
-		parts = append(parts, exitPlace(snap.status.Exit.Colo))
-	} else if snap.status.Endpoint != "" {
+	if snap.status.Endpoint != "" {
 		parts = append(parts, snap.status.Endpoint)
 	}
 	parts = append(parts, maskTitle(snap.status.Mask))
+	if snap.status.Exit.Colo != "" {
+		parts = append(parts, "выход "+exitPlace(snap.status.Exit.Colo))
+	}
 	return strings.Join(parts, " · ")
 }

@@ -229,20 +229,44 @@ func TestEstablishBringsUpRoutesAndKeepsThemOnSuccess(t *testing.T) {
 	}
 }
 
-func TestEstablishRejectsRussianExitBeforeTelegramProbe(t *testing.T) {
+// A Russian colo is only an approximation of the path, and it often carries Telegram fine. The
+// verdict must come from a real MTProto exchange, otherwise the window warns about a working VPN.
+func TestEstablishAcceptsRussianExitWhenTelegramAnswers(t *testing.T) {
 	c, core, _ := newTestController(t)
 	core.stats = Stats{Handshake: time.Now()}
 	c.trace = func(context.Context) (Exit, error) { return Exit{Colo: "DME", Country: "RU", Warp: true}, nil }
+	asked := false
 	c.telegram = func(context.Context) bool {
-		t.Fatal("a known Russian exit must not be accepted even if Telegram happens to answer")
+		asked = true
 		return true
 	}
+	candidate := store.Candidate{Endpoint: "162.159.192.1:2408", Params: awg.NewParams(awg.QUIC, ""), MTU: 1280}
+	if got := c.establish(context.Background(), testAccount(), store.Settings{}, candidate); got != connected {
+		t.Fatalf("got %v", got)
+	}
+	if !asked {
+		t.Fatal("Telegram was not asked: the exit location was trusted instead")
+	}
+	if status := c.Current(); status.Degraded || status.Text != "Подключено" {
+		t.Fatalf("status: %+v", status)
+	}
+}
+
+func TestEstablishWarnsOnlyWhenTelegramIsBlocked(t *testing.T) {
+	c, core, _ := newTestController(t)
+	core.stats = Stats{Handshake: time.Now()}
+	c.trace = func(context.Context) (Exit, error) { return Exit{Colo: "FRA", Country: "DE", Warp: true}, nil }
+	c.telegram = func(context.Context) bool { return false }
 	candidate := store.Candidate{Endpoint: "162.159.192.1:2408", Params: awg.NewParams(awg.QUIC, ""), MTU: 1280}
 	if got := c.establish(context.Background(), testAccount(), store.Settings{}, candidate); got != degraded {
 		t.Fatalf("got %v", got)
 	}
-	if !c.Current().Degraded {
-		t.Fatal("the UI must show that this route has restrictions")
+	status := c.Current()
+	if !status.Degraded || status.Text != "Подключено с ограничениями" {
+		t.Fatalf("status: %+v", status)
+	}
+	if !strings.Contains(status.Text, "ограничениями") {
+		t.Fatal("the warning cannot be shown without a reason to the user")
 	}
 }
 

@@ -16,5 +16,12 @@ if ((Test-Path $gradle) -and ((Get-Content $gradle -Raw) -match 'versionName\s*=
 # windowsgui: this is a windowed app, not a console one.
 & $go build -trimpath -ldflags "-H windowsgui -s -w -X github.com/alexus282/ByeByeRKN/windows/ui.Version=$version" -o (Join-Path $dist 'ByeByeRKN.exe') .
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-Copy-Item -Force (Join-Path $root 'wintun\amd64\wintun.dll') (Join-Path $dist 'wintun.dll')
+# A running app keeps the DLL loaded; it never changes, so the copy already next to the exe is fine.
+$dll = Join-Path $dist 'wintun.dll'
+try {
+    Copy-Item -Force (Join-Path $root 'wintun\amd64\wintun.dll') $dll -ErrorAction Stop
+} catch {
+    if (-not (Test-Path $dll)) { throw }
+    Write-Warning "wintun.dll is in use by a running ByeByeRKN; kept the existing copy"
+}
 Write-Host "Built $dist\ByeByeRKN.exe"

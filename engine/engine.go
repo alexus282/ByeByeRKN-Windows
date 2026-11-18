@@ -83,7 +83,8 @@ type result int
 const (
 	failed result = iota
 	handshakeOnly
-	degraded // WARP carries traffic, but the exit is in Russia or Telegram does not answer.
+	// degraded: WARP carries traffic, but Telegram does not answer, so the user would lose it.
+	degraded
 	connected
 )
 
@@ -262,9 +263,6 @@ func (c *Controller) connectOnce(ctx context.Context, mayReregister bool) error 
 			}
 		}
 	}
-	if russianFallback {
-		return c.serve(ctx)
-	}
 
 	endpoints := probe.Sample(scanEndpoints)
 	if settings.ManualEndpoint != "" {
@@ -307,10 +305,10 @@ searchMasks:
 				return c.serve(ctx)
 			}
 			if russianFallback {
-				// AmneziaWG endpoints for this account exit through the same Russian Cloudflare
-				// data centre. Without MASQUE there is no alternative transport in this version.
-				// Keep the working fallback instead of repeatedly taking down the user's internet
-				// for an identical result.
+				// Every AmneziaWG endpoint of this account leaves through the same Russian data
+				// centre and Telegram does not answer there. Without MASQUE there is no other
+				// transport in this version, so stop instead of taking the internet down again
+				// for the same result.
 				break searchMasks
 			}
 		}
@@ -328,12 +326,13 @@ searchMasks:
 	}
 
 	if fallback != nil {
-		// Do not leave the user without a VPN when every available exit has the same Telegram
-		// restriction. Prefer good routes during the search, then use the best degraded one.
+		// Do not leave the user without a VPN when Telegram does not answer on any route.
 		c.logf("полностью свободного выхода не найдено; использую рабочий маршрут с ограничениями")
 		current := c.Current()
-		if current.State == Connected && current.Degraded && current.Endpoint == fallback.Endpoint {
-			return c.serve(ctx)
+		if current.State == Connected && current.Degraded && current.Endpoint == fallback.Endpoint && current.Mask == fallback.Params.Mask {
+			if _, err := c.stats(); err == nil {
+				return c.serve(ctx)
+			}
 		}
 		if outcome := c.try(ctx, account, settings, *fallback); outcome == connected || outcome == degraded {
 			return c.serve(ctx)
@@ -472,13 +471,11 @@ func (c *Controller) establish(ctx context.Context, account *warp.WarpAccount, s
 	return quality
 }
 
-// routeProblem reproduces Android's Telegram safeguard. A route through a Russian Cloudflare data
-// centre is rejected without a probe: its IPv4 Telegram traffic is known to cross DPI again. Other
-// exits must answer a real MTProto request; a fresh tunnel gets a second chance before rejection.
+// routeProblem asks Telegram itself, the way the user will use it. The Cloudflare colo is not a
+// verdict: it is an approximation of the path (loc=RU even for a Helsinki exit), and a Russian
+// centre often carries Telegram fine. Only a real MTProto exchange can tell, so a fresh tunnel
+// gets a second chance before the route is marked as restricted.
 func (c *Controller) routeProblem(ctx context.Context, exit Exit) string {
-	if exit.InRussia() {
-		return fmt.Sprintf("российский выход Cloudflare (%s), на нём возможны проблемы с Telegram", exit.Colo)
-	}
 	c.setStatus(Status{State: Working, Text: "Проверяю доступность Telegram…"})
 	if c.telegram(ctx) {
 		return ""
@@ -491,7 +488,7 @@ func (c *Controller) routeProblem(ctx context.Context, exit Exit) string {
 	if c.telegram(ctx) {
 		return ""
 	}
-	return "Telegram не ответил на MTProto-запрос по IPv4"
+	return fmt.Sprintf("Telegram не ответил на MTProto-запрос по IPv4 (выход %s)", exit.Colo)
 }
 
 // serve watches a connected session until it is cancelled or looks dead. Counters only raise a

@@ -254,17 +254,9 @@ func serverCard(gtx C, u *UI, s snapshot, asSheet bool) D {
 						}),
 						layout.Rigid(layout.Spacer{Height: 14}.Layout))
 				}
-				place := "Сервер выберется автоматически"
-				parts := []string{}
+				subtitle := "AmneziaWG"
 				if connected {
-					place = s.status.Endpoint
-					if s.status.Exit.Colo != "" {
-						place = exitPlace(s.status.Exit.Colo)
-					}
-				}
-				parts = append(parts, place, "AmneziaWG")
-				if connected {
-					parts = append(parts, maskTitle(s.status.Mask))
+					subtitle = "AmneziaWG · " + maskTitle(s.status.Mask)
 				}
 				children = append(children,
 					layout.Rigid(func(gtx C) D {
@@ -274,9 +266,33 @@ func serverCard(gtx C, u *UI, s snapshot, asSheet bool) D {
 					layout.Rigid(layout.Spacer{Height: 4}.Layout),
 					layout.Rigid(func(gtx C) D {
 						gtx.Constraints.Min.X = gtx.Constraints.Max.X
-						return centered(label(th, 14, textTertiary, strings.Join(parts, " · "))).Layout(gtx)
+						return centered(label(th, 14, textTertiary, subtitle)).Layout(gtx)
 					}),
 				)
+				// The colo is where traffic leaves Cloudflare, not the server the tunnel talks to,
+				// and it is only approximate. Both lines are shown separately so the address on
+				// screen is the real one.
+				if connected {
+					children = append(children, layout.Rigid(layout.Spacer{Height: 10}.Layout))
+					if s.status.Endpoint != "" {
+						children = append(children, layout.Rigid(centered(label(th, 13.5, textSecondary,
+							"Сервер · "+s.status.Endpoint)).Layout))
+					}
+					if exit := s.status.Exit; exit.Colo != "" {
+						line := "Выход · " + exitPlace(exit.Colo) + " (" + exit.Colo
+						if exit.Country != "" {
+							line += ", " + exit.Country
+						}
+						line += ")"
+						children = append(children, layout.Rigid(func(gtx C) D {
+							return layout.Inset{Top: 3}.Layout(gtx, centered(label(th, 12.5, textQuaternary, line)).Layout)
+						}))
+					}
+				} else {
+					children = append(children, layout.Rigid(func(gtx C) D {
+						return layout.Inset{Top: 6}.Layout(gtx, centered(label(th, 14, textTertiary, "Сервер выберется автоматически")).Layout)
+					}))
+				}
 				if connected {
 					ping := "—"
 					if s.status.RTT > 0 {
