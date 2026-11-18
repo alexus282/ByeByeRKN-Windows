@@ -244,11 +244,7 @@ func (s *shell) selectMenu(id int) {
 func phaseLabel(snap snapshot) string {
 	switch snap.phase {
 	case phaseConnected:
-		text := "Подключено · " + serverLine(snap)
-		if snap.status.Degraded {
-			text += " · с ограничениями"
-		}
-		return text
+		return "Подключено · " + serverLine(snap)
 	case phaseWorking:
 		return "Подключение…"
 	case phaseRetrying:

@@ -90,7 +90,7 @@ func TestParseIpcGet(t *testing.T) {
 
 func TestParseTrace(t *testing.T) {
 	exit, ok := ParseTrace("fl=1\nip=104.28.1.1\nts=1\ncolo=FRA\nwarp=on\nloc=RU\n")
-	if !ok || !exit.Warp || exit.Colo != "FRA" || exit.Country != "RU" || exit.InRussia() {
+	if !ok || !exit.Warp || exit.Colo != "FRA" || exit.Country != "RU" {
 		t.Fatalf("%+v %v", exit, ok)
 	}
 	if _, ok := ParseTrace("warp=off\n"); ok {
@@ -182,7 +182,6 @@ func newTestController(t *testing.T) (*Controller, *fakeCore, *recordingRunner) 
 	runner := &recordingRunner{}
 	c.core = core
 	c.net = wintunnel.New(runner)
-	c.telegram = func(context.Context) bool { return true }
 	return c, core, runner
 }
 
@@ -229,57 +228,22 @@ func TestEstablishBringsUpRoutesAndKeepsThemOnSuccess(t *testing.T) {
 	}
 }
 
-// A Russian colo is only an approximation of the path, and it often carries Telegram fine. The
-// verdict must come from a real MTProto exchange, otherwise the window warns about a working VPN.
-func TestEstablishAcceptsRussianExitWhenTelegramAnswers(t *testing.T) {
+// The colo is shown, not judged: traffic through WARP is the whole proof, whatever city the exit
+// reports. There is no extra probe that could delay the connection or warn about a working VPN.
+func TestEstablishAcceptsRussianExitWithoutExtraChecks(t *testing.T) {
 	c, core, _ := newTestController(t)
 	core.stats = Stats{Handshake: time.Now()}
 	c.trace = func(context.Context) (Exit, error) { return Exit{Colo: "DME", Country: "RU", Warp: true}, nil }
-	asked := false
-	c.telegram = func(context.Context) bool {
-		asked = true
-		return true
-	}
 	candidate := store.Candidate{Endpoint: "162.159.192.1:2408", Params: awg.NewParams(awg.QUIC, ""), MTU: 1280}
+	started := time.Now()
 	if got := c.establish(context.Background(), testAccount(), store.Settings{}, candidate); got != connected {
 		t.Fatalf("got %v", got)
 	}
-	if !asked {
-		t.Fatal("Telegram was not asked: the exit location was trusted instead")
+	if elapsed := time.Since(started); elapsed > time.Second {
+		t.Fatalf("a working route took %v; nothing should be probed after the trace", elapsed)
 	}
-	if status := c.Current(); status.Degraded || status.Text != "Подключено" {
+	if status := c.Current(); status.Text != "Подключено" {
 		t.Fatalf("status: %+v", status)
-	}
-}
-
-func TestEstablishWarnsOnlyWhenTelegramIsBlocked(t *testing.T) {
-	c, core, _ := newTestController(t)
-	core.stats = Stats{Handshake: time.Now()}
-	c.trace = func(context.Context) (Exit, error) { return Exit{Colo: "FRA", Country: "DE", Warp: true}, nil }
-	c.telegram = func(context.Context) bool { return false }
-	candidate := store.Candidate{Endpoint: "162.159.192.1:2408", Params: awg.NewParams(awg.QUIC, ""), MTU: 1280}
-	if got := c.establish(context.Background(), testAccount(), store.Settings{}, candidate); got != degraded {
-		t.Fatalf("got %v", got)
-	}
-	status := c.Current()
-	if !status.Degraded || status.Text != "Подключено с ограничениями" {
-		t.Fatalf("status: %+v", status)
-	}
-	if !strings.Contains(status.Text, "ограничениями") {
-		t.Fatal("the warning cannot be shown without a reason to the user")
-	}
-}
-
-func TestRouteProblemRetriesTelegram(t *testing.T) {
-	c, _, _ := newTestController(t)
-	calls := 0
-	c.telegram = func(context.Context) bool { calls++; return calls == 2 }
-	started := time.Now()
-	if problem := c.routeProblem(context.Background(), Exit{Colo: "FRA"}); problem != "" {
-		t.Fatal(problem)
-	}
-	if calls != 2 || time.Since(started) < 1400*time.Millisecond {
-		t.Fatalf("calls=%d elapsed=%v", calls, time.Since(started))
 	}
 }
 

@@ -188,7 +188,7 @@ func (h *homeScreen) ring(gtx C, u *UI, s snapshot, diameter unit.Dp) D {
 }
 
 func statusLine(gtx C, u *UI, s snapshot) D {
-	text, c, warning := "Сервер и маскировка подберутся сами", textTertiary, ""
+	text, c := "Сервер и маскировка подберутся сами", textTertiary
 	switch s.phase {
 	case phaseWorking:
 		text = "Подключение…"
@@ -207,9 +207,6 @@ func statusLine(gtx C, u *UI, s snapshot) D {
 			since = gtx.Now
 		}
 		text = "Подключено · " + formatDuration(gtx.Now.Sub(since))
-		if s.status.Degraded {
-			warning = "Лучшего маршрута нет: Telegram может не работать"
-		}
 		c = brand
 		// The timer ticks once a second, not every frame.
 		gtx.Execute(op.InvalidateCmd{At: gtx.Now.Truncate(time.Second).Add(time.Second)})
@@ -217,15 +214,7 @@ func statusLine(gtx C, u *UI, s snapshot) D {
 	return layout.Inset{Left: 32, Right: 32}.Layout(gtx, func(gtx C) D {
 		gtx.Constraints.Min.Y = gtx.Dp(44)
 		gtx.Constraints.Min.X = 0
-		return layout.Flex{Axis: layout.Vertical, Alignment: layout.Middle}.Layout(gtx,
-			layout.Rigid(centered(label(u.th, 15, c, text)).Layout),
-			layout.Rigid(func(gtx C) D {
-				if warning == "" {
-					return D{}
-				}
-				return layout.Inset{Top: 4}.Layout(gtx, centered(label(u.th, 14, amber, warning)).Layout)
-			}),
-		)
+		return centered(label(u.th, 15, c, text)).Layout(gtx)
 	})
 }
 

@@ -17,16 +17,44 @@ import (
 	"github.com/alexus282/ByeByeRKN/windows/store"
 )
 
-// Install copies the program, creates the service and the start-menu entry. It must run elevated
-// and is safe to run over an existing installation: the service is restarted with the new binary.
-func Install(source, version string) (string, error) {
-	target := Exe()
-	if err := os.MkdirAll(Dir(), 0o755); err != nil {
+// Options are the choices the installer offers. The zero value installs to Program Files without
+// shortcuts; callers decide which ones to create.
+type Options struct {
+	Dir       string
+	SourceDir string
+	Version   string
+	StartMenu bool
+	Desktop   bool
+	Autostart bool
+}
+
+// Install copies the program, creates the service and the shortcuts. It must run elevated and is
+// safe over an existing installation: the service is restarted with the new binary.
+func Install(opts Options) (string, error) {
+	dir := filepath.Clean(opts.Dir)
+	if opts.Dir == "" {
+		dir = DefaultDir()
+	}
+	if opts.SourceDir == "" {
+		return "", errors.New("не указана папка с файлами программы")
+	}
+	source := ExeIn(opts.SourceDir)
+	dll := filepath.Join(opts.SourceDir, "wintun.dll")
+	for _, file := range []string{source, dll} {
+		if _, err := os.Stat(file); err != nil {
+			return "", fmt.Errorf("нет файла %s: %w", file, err)
+		}
+	}
+	target := ExeIn(dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	// A running window uses the exe that is about to be replaced.
-	instance.SignalQuit()
-	time.Sleep(3 * time.Second)
+
+	// A running window uses the exe that is about to be replaced; a fresh install has none and
+	// must not wait.
+	if instance.SignalQuit() {
+		time.Sleep(3 * time.Second)
+	}
 	if err := removeService(); err != nil {
 		return "", fmt.Errorf("остановить старую службу: %w", err)
 	}
@@ -35,13 +63,13 @@ func Install(source, version string) (string, error) {
 			return "", fmt.Errorf("скопировать программу: %w", err)
 		}
 	}
-	dll := filepath.Join(filepath.Dir(source), "wintun.dll")
-	dllTarget := filepath.Join(Dir(), "wintun.dll")
+	dllTarget := filepath.Join(dir, "wintun.dll")
 	if !samePath(dll, dllTarget) {
 		if err := copyFile(dll, dllTarget); err != nil {
 			return "", fmt.Errorf("скопировать wintun.dll: %w", err)
 		}
 	}
+
 	if err := os.MkdirAll(DataDir(), 0o755); err != nil {
 		return "", err
 	}
@@ -58,17 +86,29 @@ func Install(source, version string) (string, error) {
 	if err := startService(); err != nil {
 		return "", err
 	}
-	createShortcut(target)
-	writeUninstallEntry(version)
+	// Reinstall with a box cleared must remove the old shortcut as well.
+	removeShortcuts()
+	if opts.StartMenu {
+		createShortcut(StartMenuShortcut(), target)
+	}
+	if opts.Desktop {
+		createShortcut(DesktopShortcut(), target)
+	}
+	if opts.Autostart {
+		createShortcut(AutostartShortcut(), target)
+	}
+	writeUninstallEntry(opts.Version, target, dir)
 	return target, nil
 }
 
 // Uninstall closes the window, removes the service, so no route survives, then the files.
 // With removeData it also forgets the WARP account and every setting.
 func Uninstall(removeData bool) error {
+	dir := Location()
 	// The window may still be running from the folder that is about to disappear.
-	instance.SignalQuit()
-	time.Sleep(3 * time.Second)
+	if instance.SignalQuit() {
+		time.Sleep(3 * time.Second)
+	}
 
 	if err := removeService(); err != nil {
 		return fmt.Errorf("удалить службу: %w", err)
@@ -78,29 +118,36 @@ func Uninstall(removeData bool) error {
 			return err
 		}
 	}
-	os.Remove(Shortcut())
+	removeShortcuts()
 	registry.DeleteKey(registry.LOCAL_MACHINE, uninstallKey)
-	removeInstallDir()
+	removeInstallDir(dir)
 	return nil
+}
+
+func removeShortcuts() {
+	os.Remove(StartMenuShortcut())
+	os.Remove(DesktopShortcut())
+	os.Remove(AutostartShortcut())
 }
 
 // removeInstallDir deletes everything now, including the running uninstaller: a running image can
 // be renamed but not deleted, so the exe moves to TEMP and a tiny cmd removes it after exit.
-func removeInstallDir() {
-	entries, _ := os.ReadDir(Dir())
+func removeInstallDir(dir string) {
+	exe := ExeIn(dir)
+	entries, _ := os.ReadDir(dir)
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			os.Remove(filepath.Join(Dir(), entry.Name()))
+			os.Remove(filepath.Join(dir, entry.Name()))
 		}
 	}
-	if os.Remove(Dir()) == nil {
+	if os.Remove(dir) == nil {
 		return
 	}
 	moved := filepath.Join(os.TempDir(), fmt.Sprintf("ByeByeRKN-uninstall-%d.exe", os.Getpid()))
 	// The window was asked to quit; give it up to ten seconds to release the image.
 	for range 20 {
-		if err := os.Rename(Exe(), moved); err == nil {
-			os.RemoveAll(Dir())
+		if err := os.Rename(exe, moved); err == nil {
+			os.RemoveAll(dir)
 			cmd := exec.Command("cmd.exe", "/c", fmt.Sprintf("timeout /t 10 /nobreak >nul & del /q \"%s\"", moved))
 			cmd.SysProcAttr = &sysprocHide
 			cmd.Start()
@@ -109,7 +156,7 @@ func removeInstallDir() {
 		time.Sleep(500 * time.Millisecond)
 	}
 	// Renaming failed too: Windows deletes the folder at the next boot.
-	from, _ := windows.UTF16PtrFromString(Exe())
+	from, _ := windows.UTF16PtrFromString(exe)
 	windows.MoveFileEx(from, nil, windows.MOVEFILE_DELAY_UNTIL_REBOOT)
 }
 
@@ -173,11 +220,26 @@ func migrateSettings() {
 // writeClientSID lets exactly the installing account talk to the service; its private WARP key
 // must not be readable by every user on the machine.
 func writeClientSID() {
-	user, err := windows.GetCurrentProcessToken().GetTokenUser()
-	if err != nil {
-		return
+	// With over-the-shoulder UAC the elevated process may run as another administrator; the
+	// window that follows is launched by the user at the console, so that is the SID to trust.
+	sid := ""
+	if session := windows.WTSGetActiveConsoleSessionId(); session != 0xFFFFFFFF {
+		var token windows.Token
+		if err := windows.WTSQueryUserToken(session, &token); err == nil {
+			if user, err := token.GetTokenUser(); err == nil {
+				sid = user.User.Sid.String()
+			}
+			token.Close()
+		}
 	}
-	os.WriteFile(filepath.Join(DataDir(), "client.sid"), []byte(user.User.Sid.String()), 0o600)
+	if sid == "" {
+		user, err := windows.GetCurrentProcessToken().GetTokenUser()
+		if err != nil {
+			return
+		}
+		sid = user.User.Sid.String()
+	}
+	os.WriteFile(filepath.Join(DataDir(), "client.sid"), []byte(sid), 0o600)
 }
 
 func secureDataDir() error {
@@ -196,14 +258,13 @@ func secureDataDir() error {
 	return nil
 }
 
-func createShortcut(target string) {
-	link := Shortcut()
+func createShortcut(link, target string) {
 	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
 		return
 	}
 	script := fmt.Sprintf(
 		`$s=(New-Object -ComObject WScript.Shell).CreateShortcut('%s');$s.TargetPath='%s';$s.WorkingDirectory='%s';$s.Description='Cloudflare WARP на AmneziaWG';$s.Save()`,
-		quotePowerShell(link), quotePowerShell(target), quotePowerShell(Dir()))
+		quotePowerShell(link), quotePowerShell(target), quotePowerShell(filepath.Dir(target)))
 	cmd := exec.Command("powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", script)
 	cmd.SysProcAttr = &sysprocHide
 	cmd.Run()
@@ -213,7 +274,7 @@ func quotePowerShell(path string) string {
 	return strings.ReplaceAll(path, "'", "''")
 }
 
-func writeUninstallEntry(version string) {
+func writeUninstallEntry(version, exe, dir string) {
 	key, _, err := registry.CreateKey(registry.LOCAL_MACHINE, uninstallKey, registry.WRITE)
 	if err != nil {
 		return
@@ -222,10 +283,10 @@ func writeUninstallEntry(version string) {
 	key.SetStringValue("DisplayName", "ByeByeRKN")
 	key.SetStringValue("DisplayVersion", version)
 	key.SetStringValue("Publisher", "ByeByeRKN")
-	key.SetStringValue("InstallLocation", Dir())
-	key.SetStringValue("DisplayIcon", Exe()+",0")
-	key.SetStringValue("UninstallString", `"`+Exe()+`" --uninstall`)
-	key.SetStringValue("QuietUninstallString", `"`+Exe()+`" --uninstall --quiet`)
+	key.SetStringValue("InstallLocation", dir)
+	key.SetStringValue("DisplayIcon", exe+",0")
+	key.SetStringValue("UninstallString", `"`+exe+`" --uninstall`)
+	key.SetStringValue("QuietUninstallString", `"`+exe+`" --uninstall --quiet`)
 	key.SetStringValue("URLInfoAbout", "https://github.com/alexus282/ByeByeRKN")
 	key.SetDWordValue("NoModify", 1)
 	key.SetDWordValue("NoRepair", 1)

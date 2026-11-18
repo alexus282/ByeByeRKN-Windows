@@ -103,7 +103,14 @@ func installMode(quiet bool) {
 		message(err.Error(), windows.MB_ICONERROR)
 		return
 	}
-	target, err := install.Install(exe, ui.Version)
+	target, err := install.Install(install.Options{
+		Dir:       argValue("--dir"),
+		SourceDir: filepath.Dir(exe),
+		Version:   ui.Version,
+		StartMenu: !hasArg("--no-start-menu"),
+		Desktop:   hasArg("--desktop"),
+		Autostart: hasArg("--autostart"),
+	})
 	if err != nil {
 		failure(quiet, "Установка не удалась:\n\n"+err.Error())
 		return
@@ -180,4 +187,17 @@ func hasArg(name string) bool {
 		}
 	}
 	return false
+}
+
+// argValue reads --name=value or --name value.
+func argValue(name string) string {
+	for i, arg := range os.Args[1:] {
+		if strings.EqualFold(arg, name) && i+2 < len(os.Args) {
+			return os.Args[i+2]
+		}
+		if len(arg) > len(name) && strings.EqualFold(arg[:len(name)], name) && arg[len(name)] == '=' {
+			return arg[len(name)+1:]
+		}
+	}
+	return ""
 }

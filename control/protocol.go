@@ -87,7 +87,6 @@ type Status struct {
 	RTTMs    int64     `json:"rttMs,omitempty"`
 	Since    time.Time `json:"since,omitempty"`
 	Verified bool      `json:"verified,omitempty"`
-	Degraded bool      `json:"degraded,omitempty"`
 	Exit     Exit      `json:"exit"`
 }
 
@@ -107,8 +106,7 @@ func StatusOf(status engine.Status) Status {
 	return Status{
 		State: int(status.State), Text: status.Text, Endpoint: status.Endpoint, Mask: int(status.Mask),
 		RTTMs: status.RTT.Milliseconds(), Since: status.Since, Verified: status.Verified,
-		Degraded: status.Degraded,
-		Exit:     Exit{Colo: status.Exit.Colo, Country: status.Exit.Country, IP: status.Exit.IP, Warp: status.Exit.Warp},
+		Exit: Exit{Colo: status.Exit.Colo, Country: status.Exit.Country, IP: status.Exit.IP, Warp: status.Exit.Warp},
 	}
 }
 
@@ -116,8 +114,7 @@ func (s Status) Engine() engine.Status {
 	return engine.Status{
 		State: engine.State(s.State), Text: s.Text, Endpoint: s.Endpoint, Mask: awg.Mask(s.Mask),
 		RTT: time.Duration(s.RTTMs) * time.Millisecond, Since: s.Since, Verified: s.Verified,
-		Degraded: s.Degraded,
-		Exit:     engine.Exit{Colo: s.Exit.Colo, Country: s.Exit.Country, IP: s.Exit.IP, Warp: s.Exit.Warp},
+		Exit: engine.Exit{Colo: s.Exit.Colo, Country: s.Exit.Country, IP: s.Exit.IP, Warp: s.Exit.Warp},
 	}
 }
 

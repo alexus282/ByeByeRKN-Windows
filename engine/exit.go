@@ -9,22 +9,14 @@ import (
 	"time"
 )
 
-// Exit is where traffic leaves Cloudflare, parsed from a cdn-cgi/trace response.
+// Exit is where traffic leaves Cloudflare, parsed from a cdn-cgi/trace response. The colo is an
+// approximation of the path, shown to the user but never used to judge the route.
 type Exit struct {
 	Colo    string
 	Country string
 	IP      string
 	Warp    bool
 }
-
-// RussianColos are exits where traffic crosses Russian networks and DPI again. They are judged by
-// data centre, not country: Cloudflare reports loc=RU even when the exit is in Helsinki.
-var RussianColos = map[string]bool{
-	"DME": true, "SVO": true, "VKO": true, "LED": true, "KJA": true, "SVX": true,
-	"OVB": true, "KZN": true, "ROV": true, "AER": true, "KHV": true, "VVO": true,
-}
-
-func (e Exit) InRussia() bool { return RussianColos[e.Colo] }
 
 func ParseTrace(body string) (Exit, bool) {
 	var exit Exit

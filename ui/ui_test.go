@@ -105,16 +105,14 @@ func TestScreens(t *testing.T) {
 			u.status = connectedStatus()
 			u.traffic = engine.Traffic{Rx: 18 << 20, Tx: 2<<20 + 300<<10}
 		}},
-		// A Russian exit whose Telegram works: the card names the real server and shows the exit
-		// as approximate information, with no warning at all.
+		// The exit is approximate information; the card names the real server and there is no
+		// warning to get wrong.
 		{"home-connected-russian", 420, 780, func(u *UI) {
 			u.status = connectedStatus()
 			u.status.Exit = engine.Exit{Colo: "DME", Country: "RU", Warp: true}
 		}},
-		{"home-degraded-manual", 420, 780, func(u *UI) {
+		{"home-manual", 420, 780, func(u *UI) {
 			u.status = connectedStatus()
-			u.status.Degraded = true
-			u.status.Exit = engine.Exit{Colo: "DME", Country: "RU", Warp: true}
 			u.updateSettings(func(s *store.Settings) { s.Obfuscation = "STUN"; s.ManualEndpoint = "162.159.193.10:500" })
 		}},
 		{"home-failed", 420, 780, func(u *UI) {

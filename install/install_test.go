@@ -26,7 +26,7 @@ func TestPowerShellPathEscaping(t *testing.T) {
 }
 
 func TestInstallPathsStayUnderProgramFilesAndProgramData(t *testing.T) {
-	for name, path := range map[string]string{"exe": Exe(), "data": SettingsFile(), "shortcut": Shortcut()} {
+	for name, path := range map[string]string{"exe": ExeIn(DefaultDir()), "data": SettingsFile(), "shortcut": StartMenuShortcut()} {
 		if !filepath.IsAbs(path) {
 			t.Fatalf("%s is not absolute: %q", name, path)
 		}
