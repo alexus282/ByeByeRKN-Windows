@@ -134,8 +134,16 @@ func copyFile(from, to string) error {
 	if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
 		return err
 	}
-	// Overwrite in place rather than rename: a running window may hold the old exe open.
-	target, err := os.OpenFile(to, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+	// Overwrite in place rather than rename: a running window may hold the old exe open until it
+	// finishes disconnecting.
+	var target *os.File
+	for range 20 {
+		target, err = os.OpenFile(to, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
+		if err == nil {
+			break
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
 	if err != nil {
 		return err
 	}
