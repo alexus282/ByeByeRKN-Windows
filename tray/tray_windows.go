@@ -156,6 +156,9 @@ type Tray struct {
 	mu      sync.Mutex
 	icon    windows.Handle
 	tooltip string
+	// iconMu serialises icon swaps: the old handle may only be destroyed once the shell no longer
+	// shows it, and a concurrent swap must not destroy the handle the other one just installed.
+	iconMu sync.Mutex
 }
 
 // current is the one tray icon of the process; the window procedure has no other way to find it.
@@ -339,6 +342,8 @@ func (t *Tray) notify(action uintptr, balloon *[2]string) error {
 }
 
 func (t *Tray) SetIcon(img image.Image) error {
+	t.iconMu.Lock()
+	defer t.iconMu.Unlock()
 	icon, err := IconFromImage(img)
 	if err != nil {
 		return err
