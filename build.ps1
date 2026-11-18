@@ -24,4 +24,15 @@ try {
     if (-not (Test-Path $dll)) { throw }
     Write-Warning "wintun.dll is in use by a running ByeByeRKN; kept the existing copy"
 }
+# The one-file installer carries the app and the DLL, then runs the app's own --install.
+$setupDir = Join-Path $root 'cmd\setup'
+$payload = Join-Path $setupDir 'payload'
+New-Item -ItemType Directory -Force $payload | Out-Null
+Copy-Item -Force (Join-Path $dist 'ByeByeRKN.exe') $payload
+Copy-Item -Force $dll $payload
+& $go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -ico (Join-Path $root 'winres\app.ico') -manifest (Join-Path $root 'installer.manifest') -o (Join-Path $setupDir 'rsrc_windows_amd64.syso')
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+& $go build -trimpath -ldflags '-H windowsgui -s -w' -o (Join-Path $dist 'ByeByeRKN-Setup.exe') ./cmd/setup
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "Built $dist\ByeByeRKN.exe"
+Write-Host "Built $dist\ByeByeRKN-Setup.exe"

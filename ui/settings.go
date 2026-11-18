@@ -35,6 +35,9 @@ type settingsScreen struct {
 	autoAnim, trayAnim               tween
 	showAdvanced, manualServer       bool
 	endpoint                         widget.Editor
+	// clipboardText is set by a background export and written on the next frame, where the
+	// clipboard command can use the frame's operations.
+	clipboardText string
 }
 
 func (s *settingsScreen) init(settings store.Settings) {
@@ -47,20 +50,29 @@ func (s *settingsScreen) init(settings store.Settings) {
 }
 
 func (s *settingsScreen) handle(gtx C, u *UI) {
-	settings := u.store.Settings()
+	settings := u.be.Settings()
 	if s.autoConnect.Clicked(gtx) {
 		u.updateSettings(func(st *store.Settings) { st.AutoConnect = !st.AutoConnect })
 	}
 	if s.closeToTray.Clicked(gtx) {
 		u.updateSettings(func(st *store.Settings) { st.ExitOnClose = !st.ExitOnClose })
 	}
+	if s.clipboardText != "" {
+		gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(s.clipboardText))})
+		s.clipboardText = ""
+		u.toast("Конфиг скопирован")
+	}
 	if s.copyConfig.Clicked(gtx) {
-		if text, err := u.ctrl.ExportConfig(); err != nil {
-			u.toast("Не удалось получить конфиг: " + err.Error())
-		} else {
-			gtx.Execute(clipboard.WriteCmd{Type: "application/text", Data: io.NopCloser(strings.NewReader(text))})
-			u.toast("Конфиг скопирован")
-		}
+		go func() {
+			text, err := u.be.ExportConfig()
+			u.post(func() {
+				if err != nil {
+					u.toast("Не удалось получить конфиг: " + err.Error())
+					return
+				}
+				s.clipboardText = text
+			})
+		}()
 	}
 	if s.saveConfig.Clicked(gtx) {
 		s.save(u)
@@ -135,11 +147,16 @@ func (s *settingsScreen) handle(gtx C, u *UI) {
 		})
 	}
 	if s.repick.Clicked(gtx) {
-		if err := u.store.ForgetServer(); err != nil {
-			u.toast(err.Error())
-		} else {
-			u.toast("При следующем подключении сервер подберётся заново")
-		}
+		go func() {
+			err := u.be.ForgetServer()
+			u.post(func() {
+				if err != nil {
+					u.toast(err.Error())
+					return
+				}
+				u.toast("При следующем подключении сервер подберётся заново")
+			})
+		}()
 	}
 	if s.warpPlus.Clicked(gtx) {
 		s.editWarpPlus(u, settings.WarpPlusKey)
@@ -151,16 +168,21 @@ func (s *settingsScreen) handle(gtx C, u *UI) {
 			confirm:     "Сбросить",
 			destructive: true,
 			onConfirm: func(string) {
-				if err := u.store.ResetAccount(); err != nil {
-					u.toast(err.Error())
-					return
-				}
-				u.toast("Новая регистрация будет при следующем подключении")
+				go func() {
+					err := u.be.ResetAccount()
+					u.post(func() {
+						if err != nil {
+							u.toast(err.Error())
+							return
+						}
+						u.toast("Новая регистрация будет при следующем подключении")
+					})
+				}()
 			},
 		})
 	}
 	if s.folder.Clicked(gtx) && u.host.openFolder != nil {
-		u.host.openFolder(filepath.Dir(u.store.Path()))
+		u.host.openFolder(filepath.Dir(u.be.Path()))
 	}
 }
 
@@ -169,7 +191,7 @@ func (s *settingsScreen) handle(gtx C, u *UI) {
 // the disk.
 func (s *settingsScreen) applyEndpoint(u *UI) {
 	text := strings.TrimSpace(s.endpoint.Text())
-	current := u.store.Settings().ManualEndpoint
+	current := u.be.Settings().ManualEndpoint
 	next := current
 	switch {
 	case !s.manualServer:
@@ -184,15 +206,15 @@ func (s *settingsScreen) applyEndpoint(u *UI) {
 }
 
 func (s *settingsScreen) save(u *UI) {
-	text, err := u.ctrl.ExportConfig()
-	if err != nil {
-		u.toast("Не удалось получить конфиг: " + err.Error())
-		return
-	}
 	if u.host.saveFile == nil {
 		return
 	}
 	go func() {
+		text, err := u.be.ExportConfig()
+		if err != nil {
+			u.post(func() { u.toast("Не удалось получить конфиг: " + err.Error()) })
+			return
+		}
 		path, err := u.host.saveFile("byebyerkn.conf", text)
 		u.post(func() {
 			switch {
@@ -224,7 +246,7 @@ func (s *settingsScreen) editWarpPlus(u *UI, current string) {
 			}
 			u.toast("Проверяю ключ…")
 			go func() {
-				message, err := u.ctrl.ApplyWarpPlus(key)
+				message, err := u.be.ApplyWarpPlus(key)
 				u.post(func() {
 					if err != nil {
 						u.toast("Ключ не подошёл: " + err.Error())
@@ -240,7 +262,7 @@ func (s *settingsScreen) editWarpPlus(u *UI, current string) {
 func (s *settingsScreen) layout(gtx C, u *UI) D {
 	s.handle(gtx, u)
 	th := u.th
-	settings := u.store.Settings()
+	settings := u.be.Settings()
 
 	items := []layout.Widget{
 		pageTitle(th, "Настройки"),
@@ -287,10 +309,13 @@ func (s *settingsScreen) layout(gtx C, u *UI) D {
 				return row{title: "ByeByeRKN " + Version, summary: "AmneziaWG " + amneziaVersion()}.layout(gtx, th, nil, nil)
 			},
 			func(gtx C) D {
-				return row{title: "Папка настроек", summary: filepath.Dir(u.store.Path()), trail: trailArrow}.layout(gtx, th, &s.folder, nil)
+				if u.be.ServiceMode() {
+					return row{title: "Папка службы", summary: filepath.Dir(u.be.Path()) + " — доступна только службе и администраторам"}.layout(gtx, th, nil, nil)
+				}
+				return row{title: "Папка настроек", summary: filepath.Dir(u.be.Path()), trail: trailArrow}.layout(gtx, th, &s.folder, nil)
 			},
 			func(gtx C) D {
-				return row{title: "Лицензии", summary: "amneziawg-go, Wintun и Gio (MIT, Apache-2.0, Unlicense), на основе WireGuard®. Не связано с Cloudflare; WARP — сервис Cloudflare, Inc."}.layout(gtx, th, nil, nil)
+				return row{title: "Лицензии", summary: "amneziawg-go, Wintun, Gio и go-winio (MIT, Apache-2.0, Unlicense), на основе WireGuard®. Не связано с Cloudflare; WARP — сервис Cloudflare, Inc."}.layout(gtx, th, nil, nil)
 			},
 		),
 		layout.Spacer{Height: 28}.Layout,
@@ -319,7 +344,7 @@ func (s *settingsScreen) advancedItems(th *material.Theme, u *UI, settings store
 		warpSummary = key[:4] + "…" + key[len(key)-4:]
 	}
 	regSummary := "Регистрация будет при первом подключении"
-	if u.store.Account() != nil {
+	if u.be.HasAccount() {
 		regSummary = "Новый ключ и адрес WARP"
 	}
 

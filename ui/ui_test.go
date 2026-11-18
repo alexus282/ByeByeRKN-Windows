@@ -29,7 +29,7 @@ func newTestUI(t *testing.T) *UI {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return newUI(engine.New(st), st)
+	return newUI(NewLocal(engine.New(st), st))
 }
 
 // render draws frames of u the way the window would and returns the last one. Several frames let
@@ -139,14 +139,14 @@ func TestScreens(t *testing.T) {
 				"подключено: 162.159.192.7:2408 · QUIC, выход FRA (DE)",
 				"соединение подозрительно: рукопожатие не обновлялось 190 с",
 			} {
-				u.appendLog(line)
+				u.appendLog(time.Now(), line)
 			}
 		}},
 		{"log-empty", 420, 780, func(u *UI) { u.tab = tabLog }},
 		{"log-long", 420, 780, func(u *UI) {
 			u.tab = tabLog
 			for i := range 60 {
-				u.appendLog(fmt.Sprintf("строка %d: Сканирую QUIC, ответили %d", i, i%7))
+				u.appendLog(time.Now(), fmt.Sprintf("строка %d: Сканирую QUIC, ответили %d", i, i%7))
 			}
 		}},
 		{"dialog-mask", 420, 780, func(u *UI) {
@@ -182,18 +182,18 @@ func TestSettingsPersistImmediately(t *testing.T) {
 	u.settings.manualServer = true
 	u.settings.endpoint.SetText("162.159.192.1:24")
 	u.settings.applyEndpoint(u)
-	if got := u.store.Settings().ManualEndpoint; got != "162.159.192.1:24" {
+	if got := u.be.Settings().ManualEndpoint; got != "162.159.192.1:24" {
 		t.Fatalf("endpoint = %q", got)
 	}
 	// A half-typed address keeps the last valid one.
 	u.settings.endpoint.SetText("162.159.")
 	u.settings.applyEndpoint(u)
-	if got := u.store.Settings().ManualEndpoint; got != "162.159.192.1:24" {
+	if got := u.be.Settings().ManualEndpoint; got != "162.159.192.1:24" {
 		t.Fatalf("endpoint after invalid text = %q", got)
 	}
 	u.settings.manualServer = false
 	u.settings.applyEndpoint(u)
-	if got := u.store.Settings().ManualEndpoint; got != "" {
+	if got := u.be.Settings().ManualEndpoint; got != "" {
 		t.Fatalf("auto server kept %q", got)
 	}
 }

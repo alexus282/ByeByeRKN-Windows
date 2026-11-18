@@ -59,10 +59,9 @@ type host struct {
 }
 
 type UI struct {
-	th    *material.Theme
-	ctrl  *engine.Controller
-	store *store.Store
-	host  host
+	th   *material.Theme
+	be   Backend
+	host host
 
 	mu       sync.Mutex
 	status   engine.Status
@@ -82,11 +81,12 @@ type UI struct {
 	toastAt   time.Time
 }
 
-func newUI(ctrl *engine.Controller, st *store.Store) *UI {
-	u := &UI{th: newTheme(), ctrl: ctrl, store: st}
-	u.status = ctrl.Current()
-	u.traffic = ctrl.TrafficNow()
-	u.settings.init(st.Settings())
+func newUI(be Backend) *UI {
+	u := &UI{th: newTheme(), be: be}
+	u.status = be.Status()
+	u.traffic = be.Traffic()
+	u.logs = be.InitialLogs()
+	u.settings.init(be.Settings())
 	return u
 }
 
@@ -122,9 +122,9 @@ func (u *UI) setTraffic(traffic engine.Traffic) {
 	u.invalidate()
 }
 
-func (u *UI) appendLog(line string) {
+func (u *UI) appendLog(at time.Time, line string) {
 	u.mu.Lock()
-	u.logs = append(u.logs, logLine{at: time.Now(), text: line})
+	u.logs = append(u.logs, logLine{at: at, text: line})
 	if len(u.logs) > maxLogLines {
 		u.logs = append([]logLine(nil), u.logs[len(u.logs)-maxLogLines/2:]...)
 	}
@@ -141,7 +141,7 @@ type snapshot struct {
 }
 
 func (u *UI) snapshot() snapshot {
-	running := u.ctrl.Running()
+	running := u.be.Running()
 	u.mu.Lock()
 	defer u.mu.Unlock()
 	s := snapshot{status: u.status, traffic: u.traffic, logs: u.logs}
@@ -162,8 +162,8 @@ func (u *UI) snapshot() snapshot {
 
 // toggle is the ring button and the tray item: connect when idle, otherwise stop whatever runs.
 func (u *UI) toggle() {
-	if !u.ctrl.Running() {
-		u.ctrl.Connect()
+	if !u.be.Running() {
+		u.be.Connect()
 		u.invalidate()
 		return
 	}
@@ -177,7 +177,7 @@ func (u *UI) toggle() {
 	u.invalidate()
 	// Disconnect waits for netsh to remove routes and DNS: never on the window's goroutine.
 	go func() {
-		u.ctrl.Disconnect()
+		u.be.DisconnectWait(30 * time.Second)
 		u.mu.Lock()
 		u.stopping = false
 		u.mu.Unlock()
@@ -192,9 +192,9 @@ func (u *UI) toast(text string) {
 }
 
 func (u *UI) updateSettings(change func(*store.Settings)) {
-	settings := u.store.Settings()
+	settings := u.be.Settings()
 	change(&settings)
-	if err := u.store.SetSettings(settings); err != nil {
+	if err := u.be.SetSettings(settings); err != nil {
 		u.toast("Не удалось сохранить настройки: " + err.Error())
 	}
 }

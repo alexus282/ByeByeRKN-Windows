@@ -5,13 +5,12 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"gioui.org/app"
 	"gioui.org/io/system"
 	"gioui.org/op"
 
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/store"
 	"github.com/alexus282/ByeByeRKN/windows/tray"
 )
 
@@ -24,11 +23,10 @@ const (
 
 // shell owns the native side: the Gio window, its hiding into the tray, and the tray icon.
 type shell struct {
-	ui    *UI
-	ctrl  *engine.Controller
-	store *store.Store
-	win   *app.Window
-	tray  *tray.Tray
+	ui   *UI
+	be   Backend
+	win  *app.Window
+	tray *tray.Tray
 
 	hwnd      atomic.Uintptr
 	hidden    atomic.Bool
@@ -44,10 +42,10 @@ type shell struct {
 
 // Run shows the window and the tray icon and serves them until the user quits; quitting
 // disconnects and ends the process, so Run never returns. show wakes the window when another
-// launch of the app asks for it.
-func Run(ctrl *engine.Controller, st *store.Store, show <-chan struct{}) {
-	u := newUI(ctrl, st)
-	s := &shell{ui: u, ctrl: ctrl, store: st, win: new(app.Window)}
+// launch of the app asks for it, quit closes it when the uninstaller needs the files.
+func Run(be Backend, show, quit <-chan struct{}) {
+	u := newUI(be)
+	s := &shell{ui: u, be: be, win: new(app.Window)}
 	s.win.Option(app.Title("ByeByeRKN"), app.Size(420, 780), app.MinSize(360, 560))
 	u.host = host{
 		invalidate: s.changed,
@@ -56,21 +54,22 @@ func Run(ctrl *engine.Controller, st *store.Store, show <-chan struct{}) {
 		},
 		openFolder: openFolder,
 	}
-	ctrl.OnStatus = u.setStatus
-	ctrl.OnTraffic = u.setTraffic
-	ctrl.OnLog = u.appendLog
+	be.SetHandlers(u.setStatus, u.setTraffic, u.appendLog)
 
 	if t, err := tray.New(tray.Options{
-		Tooltip:      "ByeByeRKN",
-		Icon:         trayGlyph(tray.IconSize(), phaseIdle),
-		OnClick:      s.show,
-		Menu:         s.menu,
-		OnSelect:     s.selectMenu,
-		OnEndSession: ctrl.Disconnect,
+		Tooltip:  "ByeByeRKN",
+		Icon:     trayGlyph(tray.IconSize(), phaseIdle),
+		OnClick:  s.show,
+		Menu:     s.menu,
+		OnSelect: s.selectMenu,
+		OnEndSession: func() {
+			// The service also handles shutdown, but a portable window owns the routes itself.
+			be.DisconnectWait(20 * time.Second)
+		},
 	}); err == nil {
 		s.tray = t
 	} else {
-		u.appendLog("значок в трее недоступен: " + err.Error())
+		u.appendLog(time.Now(), "значок в трее недоступен: "+err.Error())
 	}
 	s.mu.Lock()
 	s.trayReady = true
@@ -83,8 +82,13 @@ func Run(ctrl *engine.Controller, st *store.Store, show <-chan struct{}) {
 			s.show()
 		}
 	}()
-	if st.Settings().AutoConnect {
-		ctrl.Connect()
+	go func() {
+		for range quit {
+			s.quit()
+		}
+	}()
+	if be.Settings().AutoConnect {
+		be.Connect()
 	}
 	app.Main()
 }
@@ -105,7 +109,7 @@ func (s *shell) loop() {
 				break
 			}
 			e.Abort()
-			if s.store.Settings().ExitOnClose || s.tray == nil {
+			if s.be.Settings().ExitOnClose || s.tray == nil {
 				go s.quit()
 			} else {
 				s.hide()
@@ -133,10 +137,10 @@ func (s *shell) hide() {
 	}
 	hideWindow(hwnd)
 	s.hidden.Store(true)
-	if settings := s.store.Settings(); !settings.TrayHintShown && s.tray != nil {
+	if settings := s.be.Settings(); !settings.TrayHintShown && s.tray != nil {
 		s.tray.Notify("ByeByeRKN работает в трее", "VPN продолжает работать. Щёлкните по значку, чтобы открыть окно; выйти можно из его меню.")
 		settings.TrayHintShown = true
-		s.store.SetSettings(settings)
+		s.be.SetSettings(settings)
 	}
 }
 
@@ -161,7 +165,8 @@ func (s *shell) quit() {
 		if s.tray != nil {
 			s.tray.SetTooltip("ByeByeRKN\nОтключение…")
 		}
-		s.ctrl.Disconnect()
+		s.be.DisconnectWait(30 * time.Second)
+		s.be.Close()
 		if s.tray != nil {
 			s.tray.Close()
 		}

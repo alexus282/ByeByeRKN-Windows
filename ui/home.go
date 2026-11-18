@@ -88,7 +88,7 @@ func (h *homeScreen) layout(gtx C, u *UI, s snapshot) D {
 
 // chips reminds about settings that take the choice away from the automatic search.
 func (h *homeScreen) chips(gtx C, u *UI) D {
-	text := overridesText(u.store.Settings())
+	text := overridesText(u.be.Settings())
 	if text == "" {
 		return D{}
 	}

@@ -4,6 +4,7 @@ go 1.26.10
 
 require (
 	gioui.org v0.10.3
+	github.com/Microsoft/go-winio v0.6.4
 	github.com/amnezia-vpn/amneziawg-go v1.0.4
 	golang.org/x/crypto v0.59.0
 	golang.org/x/exp/shiny v0.0.0-20250408133849-7e4ce0ab07d0

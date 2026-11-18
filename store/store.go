@@ -82,11 +82,21 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
-// DefaultPath is %AppData%\ByeByeRKN\settings.json.
+// DefaultPath is %AppData%\ByeByeRKN\settings.json, the portable, per-user location.
 func DefaultPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
+	}
+	return filepath.Join(dir, "ByeByeRKN", "settings.json"), nil
+}
+
+// MachinePath is %ProgramData%\ByeByeRKN\settings.json. The service owns one tunnel for the
+// machine, so its account and choices cannot live in a single user's profile.
+func MachinePath() (string, error) {
+	dir := os.Getenv("ProgramData")
+	if dir == "" {
+		return "", errors.New("ProgramData is not set")
 	}
 	return filepath.Join(dir, "ByeByeRKN", "settings.json"), nil
 }
