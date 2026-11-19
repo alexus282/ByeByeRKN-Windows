@@ -190,6 +190,11 @@ netsh interface ipv6 set dnsservers name=ByeByeRKN source=dhcp
 - Принудительное завершение процесса из диспетчера задач не даёт снять маршруты; служба корректно
   обрабатывает Stop/Shutdown, но не `TerminateProcess`.
 
+## Разработка
+
+Архитектура, известные ловушки и планы — в [DEVELOPMENT.md](DEVELOPMENT.md), история версий — в
+[CHANGELOG.md](CHANGELOG.md).
+
 ## Лицензия
 
 [Apache License 2.0](LICENSE). `wintun.dll` распространяется по своей лицензии —
