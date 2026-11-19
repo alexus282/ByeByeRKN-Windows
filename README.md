@@ -1,6 +1,25 @@
-# ByeByeRKN для Windows
+<p align="center">
+  <img src="docs/readme.webp" width="240" alt="ByeByeRKN">
+</p>
 
-**0.1.0 alpha** — первый релиз Windows-порта [Android-приложения ByeByeRKN](https://github.com/alexus282/ByeByeRKN).
+<h1 align="center">ByeByeRKN для Windows</h1>
+
+<p align="center">
+  <a href="https://github.com/alexus282/ByeByeRKN-Windows/releases/latest"><img src="https://img.shields.io/github/v/release/alexus282/ByeByeRKN-Windows?color=blue" alt="release"></a>
+  <a href="https://github.com/alexus282/ByeByeRKN-Windows/releases"><img src="https://img.shields.io/github/downloads/alexus282/ByeByeRKN-Windows/total?color=brightgreen" alt="downloads"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/alexus282/ByeByeRKN-Windows?color=orange" alt="license"></a>
+</p>
+
+<p align="center">
+  <b>0.1.0 alpha</b> — первый релиз Windows-порта
+  <a href="https://github.com/alexus282/ByeByeRKN">Android-приложения ByeByeRKN</a>.
+</p>
+
+<p align="center">
+  <a href="https://github.com/alexus282/ByeByeRKN-Windows/releases/latest"><b>Скачать установщик</b></a>
+  · Windows 10/11 x64 · UAC один раз при установке
+</p>
+
 Клиент Cloudflare WARP на AmneziaWG с обычным окном, иконкой в трее и службой Windows.
 
 Код на Go, ядро туннеля — `github.com/amnezia-vpn/amneziawg-go`, интерфейс — `gioui.org`
