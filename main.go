@@ -178,9 +178,13 @@ func relaunchElevated(extra ...string) error {
 		return err
 	}
 	args := append(append([]string{}, os.Args[1:]...), extra...)
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = windows.EscapeArg(arg)
+	}
 	verb, _ := windows.UTF16PtrFromString("runas")
 	file, _ := windows.UTF16PtrFromString(exe)
-	arguments, _ := windows.UTF16PtrFromString(strings.Join(args, " "))
+	arguments, _ := windows.UTF16PtrFromString(strings.Join(quoted, " "))
 	dir, _ := windows.UTF16PtrFromString(filepath.Dir(exe))
 	return windows.ShellExecute(0, verb, file, arguments, dir, windows.SW_SHOW)
 }
