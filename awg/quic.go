@@ -35,6 +35,11 @@ func ClientInitialKeys(dcid []byte) InitialKeys {
 }
 
 func QuicInitial(sni string) []byte {
+	// A host name is at most 253 bytes; a pasted longer string would otherwise overflow the
+	// ClientHello and panic the tunnel service during a scan.
+	if len(sni) > 253 {
+		sni = sni[:253]
+	}
 	dcid := randomBytes(8)
 	keys := ClientInitialKeys(dcid)
 	crypto := cryptoFrame(clientHello(sni))
@@ -50,7 +55,8 @@ func QuicInitial(sni string) []byte {
 
 	payloadLength := minDatagram - len(headerWithoutLength) - 2 - pnLength - tagLength
 	if payloadLength < len(crypto) {
-		panic("ClientHello does not fit into one datagram")
+		// No disguise is better than killing the service; the handshake still works without I1.
+		return nil
 	}
 	payload := make([]byte, payloadLength) // the rest is PADDING frames (zeros)
 	copy(payload, crypto)

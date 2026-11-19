@@ -67,6 +67,18 @@ func TestQuicInitialDecryptsToClientHello(t *testing.T) {
 	}
 }
 
+// A pasted host name can be arbitrarily long; the disguise must be clamped or skipped, never
+// panic the service that is scanning endpoints.
+func TestQuicInitialClampsHugeSNI(t *testing.T) {
+	packet := QuicInitial(strings.Repeat("a", 10_000) + ".ru")
+	if packet == nil {
+		t.Fatal("a clamped SNI should still fit")
+	}
+	if len(packet) > minDatagram {
+		t.Fatalf("packet is %d bytes", len(packet))
+	}
+}
+
 func TestStunFingerprintIsValid(t *testing.T) {
 	p := STUNBindingRequest()
 	if binary.BigEndian.Uint16(p) != 1 || int(binary.BigEndian.Uint16(p[2:]))+20 != len(p) {

@@ -140,7 +140,7 @@ func (s *settingsScreen) handle(gtx C, u *UI) {
 			editor:   ed,
 			hint:     "ya.ru",
 			confirm:  "Сохранить",
-			validate: func(v string) bool { return v == "" || hostPattern.MatchString(v) },
+			validate: func(v string) bool { return v == "" || (len(v) <= 253 && hostPattern.MatchString(v)) },
 			onConfirm: func(v string) {
 				u.updateSettings(func(st *store.Settings) { st.QuicSNI = v })
 			},
