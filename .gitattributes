@@ -1,0 +1,10 @@
+# The ECDSA signature covers the exact bytes of warp.json. Git must check both files out with
+# LF line endings even when core.autocrlf is enabled.
+catalog/warp.json text eol=lf
+catalog/warp.json.sig text eol=lf
+
+*.png binary
+*.ico binary
+*.webp binary
+*.dll binary
+*.syso binary
