@@ -31,7 +31,6 @@ var (
 	icUnfold   = mustIcon(icons.NavigationUnfoldMore)
 	icCheck    = mustIcon(icons.NavigationCheck)
 	icTune     = mustIcon(icons.ImageTune)
-	icWarning  = mustIcon(icons.AlertWarning)
 	icCopy     = mustIcon(icons.ContentContentCopy)
 	icDelete   = mustIcon(icons.ActionDelete)
 )

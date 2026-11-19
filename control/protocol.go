@@ -6,9 +6,9 @@ package control
 import (
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/engine"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 const (

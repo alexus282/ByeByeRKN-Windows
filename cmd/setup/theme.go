@@ -16,7 +16,6 @@ import (
 // Same palette as the app, so the installer does not look like a foreign program.
 var (
 	bgBase        = rgb(0x101012)
-	bgSurface     = rgb(0x18181B)
 	bgSurfaceAlt  = rgb(0x1F1F23)
 	bgSheet       = rgb(0x313136)
 	bgPanel       = rgb(0x3F3F46)
@@ -88,10 +87,5 @@ func bold(l material.LabelStyle) material.LabelStyle {
 
 func semibold(l material.LabelStyle) material.LabelStyle {
 	l.Font.Weight = font.SemiBold
-	return l
-}
-
-func centered(l material.LabelStyle) material.LabelStyle {
-	l.Alignment = text.Middle
 	return l
 }

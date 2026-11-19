@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/warp"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/warp"
 )
 
 // RenderUAPI builds amneziawg-go's configuration protocol: the device section up to the first

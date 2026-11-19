@@ -12,10 +12,10 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/catalog"
-	"github.com/alexus282/ByeByeRKN/windows/store"
-	"github.com/alexus282/ByeByeRKN/windows/warp"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/catalog"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/warp"
 )
 
 const defaultEndpoint = "162.159.192.1:2408"

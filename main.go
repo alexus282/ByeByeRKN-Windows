@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,12 +11,13 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/install"
-	"github.com/alexus282/ByeByeRKN/windows/instance"
-	"github.com/alexus282/ByeByeRKN/windows/store"
-	"github.com/alexus282/ByeByeRKN/windows/ui"
-	"github.com/alexus282/ByeByeRKN/windows/winsvc"
+	"github.com/alexus282/ByeByeRKN-Windows/catalog"
+	"github.com/alexus282/ByeByeRKN-Windows/engine"
+	"github.com/alexus282/ByeByeRKN-Windows/install"
+	"github.com/alexus282/ByeByeRKN-Windows/instance"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/ui"
+	"github.com/alexus282/ByeByeRKN-Windows/winsvc"
 )
 
 func main() {
@@ -87,6 +89,9 @@ func runPortable(show, quit <-chan struct{}) {
 		message("Не удалось прочитать настройки "+path+": "+err.Error(), windows.MB_ICONERROR)
 		return
 	}
+	cache := catalog.CachePath(filepath.Dir(path))
+	catalog.LoadCache(cache)
+	go catalog.Refresh(context.Background(), cache)
 	ctrl := engine.New(st)
 	ui.Run(ui.NewLocal(ctrl, st), show, quit)
 }

@@ -10,8 +10,8 @@ import (
 
 	"github.com/Microsoft/go-winio"
 
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/engine"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 // Client is the window's side of the pipe. It keeps the last state the service sent, so the UI
@@ -154,6 +154,9 @@ func (c *Client) close() {
 
 // Close ends this window's connection; the service and the tunnel keep running.
 func (c *Client) Close() { c.close() }
+
+// Done is closed when the service goes away or the pipe breaks, so the window can reconnect.
+func (c *Client) Done() <-chan struct{} { return c.done }
 
 func (c *Client) SetHandler(handler func(Message)) {
 	c.mu.Lock()

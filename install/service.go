@@ -7,7 +7,7 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
-	"github.com/alexus282/ByeByeRKN/windows/control"
+	"github.com/alexus282/ByeByeRKN-Windows/control"
 )
 
 // removeService stops and deletes the service. A missing service is not an error: install and

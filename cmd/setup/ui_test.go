@@ -91,8 +91,19 @@ func TestInstallerScreens(t *testing.T) {
 
 func TestPathValidation(t *testing.T) {
 	in := newTestInstaller()
-	in.dir.SetText("relative\\folder")
-	if err := in.runInstall("relative\\folder", true, false, false); err == nil {
-		t.Fatal("a relative installation directory must be rejected")
+	for _, dir := range []string{"relative\\folder", `C:\`, `\\server\share`} {
+		if err := in.runInstall(dir, true, false, false); err == nil {
+			t.Fatalf("%q must be rejected before the payload is touched", dir)
+		}
+	}
+}
+
+func TestExpandEnv(t *testing.T) {
+	t.Setenv("BBR_SETUP_TEST", `D:\Apps`)
+	if got := expandEnv(`%BBR_SETUP_TEST%\ByeByeRKN`); got != `D:\Apps\ByeByeRKN` {
+		t.Fatalf("got %q", got)
+	}
+	if got := expandEnv(`C:\NoVariables`); got != `C:\NoVariables` {
+		t.Fatalf("got %q", got)
 	}
 }

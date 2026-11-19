@@ -1,4 +1,4 @@
-module github.com/alexus282/ByeByeRKN/windows
+module github.com/alexus282/ByeByeRKN-Windows
 
 go 1.26.10
 

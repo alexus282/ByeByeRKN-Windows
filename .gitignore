@@ -1,0 +1,11 @@
+# Build output stays local.
+dist/
+*.exe
+
+# The installer's payload is filled by build.ps1; only the placeholder is tracked.
+cmd/setup/payload/*
+!cmd/setup/payload/placeholder.txt
+
+# Local settings and logs never belong in the repository.
+settings.json
+*.log

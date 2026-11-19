@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/warp"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/warp"
 )
 
 func TestStoreSurvivesARestart(t *testing.T) {

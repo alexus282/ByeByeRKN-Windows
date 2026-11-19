@@ -16,9 +16,9 @@ import (
 	"gioui.org/unit"
 	"gioui.org/widget"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/engine"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 type homeScreen struct {
@@ -196,7 +196,7 @@ func statusLine(gtx C, u *UI, s snapshot) D {
 			text = s.status.Text
 		}
 	case phaseRetrying:
-		text, c = s.status.Text+"\nПовторю автоматически.", danger
+		text, c = orDefault(s.status.Text, "Нет связи")+"\nПовторю автоматически.", danger
 	case phaseFailed:
 		text, c = s.status.Text, danger
 	case phaseStopping:

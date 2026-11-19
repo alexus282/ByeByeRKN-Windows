@@ -8,7 +8,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
 )
 
 // Probe sends exactly what AmneziaWG sends when connecting (I1, junk packets, handshake

@@ -1,0 +1,39 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -count=1
+
+      - name: Build
+        shell: powershell
+        run: .\build.ps1
+
+      - name: Upload artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ByeByeRKN-${{ github.ref_name }}
+          path: |
+            dist/ByeByeRKN.exe
+            dist/wintun.dll
+            dist/ByeByeRKN-Setup.exe
+          if-no-files-found: error

@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/warp"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/warp"
 )
 
 // Settings is the small set of choices the Windows app exposes. An empty obfuscation or endpoint

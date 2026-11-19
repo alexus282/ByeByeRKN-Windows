@@ -10,7 +10,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 func startTestServer(t *testing.T) (*Server, string) {

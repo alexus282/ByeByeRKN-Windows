@@ -277,8 +277,11 @@ func (c *Client) applyLicense(version, _, id, token, license string, headers map
 
 // hostOf is "162.159.198.1:0" or "[2606:4700:103::]:0" without the port and brackets.
 func hostOf(endpoint string) string {
-	host := endpoint[:strings.LastIndexByte(endpoint, ':')]
-	return strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+	i := strings.LastIndexByte(endpoint, ':')
+	if i < 0 {
+		return endpoint
+	}
+	return strings.TrimSuffix(strings.TrimPrefix(endpoint[:i], "["), "]")
 }
 
 var licensePattern = regexp.MustCompile(`^[A-Za-z0-9]{8}-[A-Za-z0-9]{8}-[A-Za-z0-9]{8}$`)

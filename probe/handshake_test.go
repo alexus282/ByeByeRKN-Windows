@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
 	"golang.org/x/crypto/chacha20poly1305"
 )
 

@@ -1,20 +1,21 @@
 # Builds dist\ByeByeRKN.exe and puts wintun.dll next to it, where the Wintun loader looks for it.
 $ErrorActionPreference = 'Stop'
-$go = 'C:\android\go\bin\go.exe'
-if (-not (Test-Path $go)) { $go = 'go' }
+$go = (Get-Command go -ErrorAction SilentlyContinue).Source
+if (-not $go) { $go = 'C:\android\go\bin\go.exe' }
+if (-not (Test-Path $go)) { throw "Go is not installed. Put go.exe in PATH or set C:\android\go\bin\go.exe." }
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $root
 $dist = Join-Path $root 'dist'
 New-Item -ItemType Directory -Force $dist | Out-Null
 
-# The Windows app shares its version with the Android one.
-$version = 'dev'
-$gradle = Join-Path (Split-Path -Parent $root) 'app\build.gradle.kts'
-if ((Test-Path $gradle) -and ((Get-Content $gradle -Raw) -match 'versionName\s*=\s*"([^"]+)"')) { $version = $Matches[1] }
+# The Windows port is released independently of the Android app; its version lives in VERSION.
+$version = '0.1.0'
+$versionFile = Join-Path $root 'VERSION'
+if (Test-Path $versionFile) { $version = (Get-Content $versionFile -Raw).Trim() }
 
 # windowsgui: this is a windowed app, not a console one.
-& $go build -trimpath -ldflags "-H windowsgui -s -w -X github.com/alexus282/ByeByeRKN/windows/ui.Version=$version" -o (Join-Path $dist 'ByeByeRKN.exe') .
+& $go build -trimpath -ldflags "-H windowsgui -s -w -X github.com/alexus282/ByeByeRKN-Windows/ui.Version=$version" -o (Join-Path $dist 'ByeByeRKN.exe') .
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 # A running app keeps the DLL loaded; it never changes, so the copy already next to the exe is fine.
 $dll = Join-Path $dist 'wintun.dll'

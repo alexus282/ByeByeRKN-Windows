@@ -18,12 +18,12 @@ import (
 	"gioui.org/widget"
 	"gioui.org/widget/material"
 
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/engine"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 // Version is set by build.ps1 from the Android app's versionName.
-var Version = "dev"
+var Version = "0.1.0"
 
 const (
 	tabHome = iota

@@ -11,7 +11,7 @@ import (
 	"math/big"
 	"strings"
 
-	"github.com/alexus282/ByeByeRKN/windows/catalog"
+	"github.com/alexus282/ByeByeRKN-Windows/catalog"
 )
 
 type Mask int

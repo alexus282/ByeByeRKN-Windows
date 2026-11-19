@@ -9,7 +9,7 @@ import (
 
 	xdraw "golang.org/x/image/draw"
 
-	"github.com/alexus282/ByeByeRKN/windows/winres"
+	"github.com/alexus282/ByeByeRKN-Windows/winres"
 )
 
 // trayGlyph is the notification-area icon: the app's own artwork, scaled to the tiny taskbar

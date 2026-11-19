@@ -2,11 +2,12 @@ package ui
 
 import (
 	"errors"
+	"sync"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/control"
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/control"
+	"github.com/alexus282/ByeByeRKN-Windows/engine"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 // Backend is everything the window needs from whoever owns the tunnel: the service in a normal
@@ -53,12 +54,12 @@ func (b *localBackend) Path() string             { return b.store.Path() }
 func (b *localBackend) HasAccount() bool         { return b.store.Account() != nil }
 func (b *localBackend) ServiceMode() bool        { return false }
 
-func (b *localBackend) Running() bool                  { return b.ctrl.Running() }
-func (b *localBackend) Status() engine.Status          { return b.ctrl.Current() }
-func (b *localBackend) Traffic() engine.Traffic        { return b.ctrl.TrafficNow() }
-func (b *localBackend) Connect()                       { b.ctrl.Connect() }
-func (b *localBackend) Disconnect()                    { go b.ctrl.Disconnect() }
-func (b *localBackend) DisconnectWait(t time.Duration) { b.ctrl.Disconnect() }
+func (b *localBackend) Running() bool                { return b.ctrl.Running() }
+func (b *localBackend) Status() engine.Status        { return b.ctrl.Current() }
+func (b *localBackend) Traffic() engine.Traffic      { return b.ctrl.TrafficNow() }
+func (b *localBackend) Connect()                     { b.ctrl.Connect() }
+func (b *localBackend) Disconnect()                  { go b.ctrl.Disconnect() }
+func (b *localBackend) DisconnectWait(time.Duration) { b.ctrl.Disconnect() }
 
 func (b *localBackend) ExportConfig() (string, error)            { return b.ctrl.ExportConfig() }
 func (b *localBackend) ApplyWarpPlus(key string) (string, error) { return b.ctrl.ApplyWarpPlus(key) }
@@ -80,13 +81,24 @@ func (b *localBackend) SetHandlers(onStatus func(engine.Status), onTraffic func(
 func (b *localBackend) InitialLogs() []logLine { return nil }
 func (b *localBackend) Close()                 {}
 
+// remoteBackend talks to the service. It survives a service restart: when the pipe closes it
+// retries in the background and tells the window what is happening.
 type remoteBackend struct {
-	client *control.Client
+	mu        sync.Mutex
+	client    *control.Client
+	online    bool
+	closed    bool
+	onStatus  func(engine.Status)
+	onTraffic func(engine.Traffic)
+	onLog     func(time.Time, string)
 }
 
 // NewRemote is the normal mode: the service owns the tunnel and this process needs no rights.
 func NewRemote(client *control.Client) Backend {
-	return &remoteBackend{client: client}
+	b := &remoteBackend{client: client, online: true}
+	client.SetHandler(b.dispatch)
+	go b.watch(client)
+	return b
 }
 
 // DialRemote connects to a running service. The error is meant for the user: it tells whether the
@@ -99,47 +111,190 @@ func DialRemote(timeout time.Duration) (Backend, error) {
 	return NewRemote(client), nil
 }
 
-func (b *remoteBackend) Settings() store.Settings { return b.client.Settings() }
-func (b *remoteBackend) Path() string             { return b.client.Path() }
-func (b *remoteBackend) HasAccount() bool         { return b.client.HasAccount() }
-func (b *remoteBackend) ServiceMode() bool        { return true }
+func (b *remoteBackend) dispatch(message control.Message) {
+	b.mu.Lock()
+	onStatus, onTraffic, onLog := b.onStatus, b.onTraffic, b.onLog
+	b.mu.Unlock()
+	switch message.Type {
+	case control.MsgHello, control.MsgStatus:
+		if message.Status != nil && onStatus != nil {
+			onStatus(message.Status.Engine())
+		}
+	case control.MsgTraffic:
+		if message.Traffic != nil && onTraffic != nil {
+			onTraffic(message.Traffic.Engine())
+		}
+	case control.MsgLog:
+		if message.Log != nil && onLog != nil {
+			onLog(message.Log.At, message.Log.Text)
+		}
+	}
+}
 
-func (b *remoteBackend) Running() bool                  { return b.client.Running() }
-func (b *remoteBackend) Status() engine.Status          { return b.client.Status() }
-func (b *remoteBackend) Traffic() engine.Traffic        { return b.client.Traffic() }
-func (b *remoteBackend) Connect()                       { b.client.Connect() }
-func (b *remoteBackend) Disconnect()                    { b.client.Disconnect() }
-func (b *remoteBackend) DisconnectWait(t time.Duration) { b.client.DisconnectWait(t) }
+// watch notices a dead pipe and reconnects. The service is restarted by SCM recovery, by an
+// update, or by the user in services.msc; none of that should leave the window unusable.
+func (b *remoteBackend) watch(old *control.Client) {
+	resume := old.Running()
+	<-old.Done()
+	b.mu.Lock()
+	if b.closed || b.client != old {
+		b.mu.Unlock()
+		return
+	}
+	b.online = false
+	onStatus := b.onStatus
+	b.mu.Unlock()
+	if onStatus != nil {
+		onStatus(engine.Status{State: engine.Failed, Text: "Служба ByeByeRKN остановилась. Переподключаюсь…"})
+	}
+	for {
+		b.mu.Lock()
+		closed := b.closed
+		b.mu.Unlock()
+		if closed {
+			return
+		}
+		time.Sleep(2 * time.Second)
+		client, err := control.Dial(2 * time.Second)
+		if err != nil {
+			continue
+		}
+		b.mu.Lock()
+		if b.closed {
+			b.mu.Unlock()
+			client.Close()
+			return
+		}
+		b.client = client
+		b.online = true
+		b.mu.Unlock()
+		client.SetHandler(b.dispatch)
+		// Dial already consumed the hello, so deliver the state it carried.
+		b.dispatch(control.Message{Type: control.MsgStatus, Status: ptrStatus(client.Status())})
+		b.dispatch(control.Message{Type: control.MsgTraffic, Traffic: ptrTraffic(client.Traffic())})
+		if resume && !client.Running() {
+			// The service was updated or recovered while the window was open: keep the user's
+			// VPN intent instead of silently leaving it disconnected.
+			client.Connect()
+		}
+		return
+	}
+}
 
-func (b *remoteBackend) ExportConfig() (string, error)            { return b.client.ExportConfig() }
-func (b *remoteBackend) ApplyWarpPlus(key string) (string, error) { return b.client.ApplyWarpPlus(key) }
-func (b *remoteBackend) ForgetServer() error                      { return b.client.ForgetServer() }
-func (b *remoteBackend) ResetAccount() error                      { return b.client.ResetAccount() }
+func ptrStatus(status engine.Status) *control.Status {
+	converted := control.StatusOf(status)
+	return &converted
+}
+
+func ptrTraffic(traffic engine.Traffic) *control.Traffic {
+	converted := control.TrafficOf(traffic)
+	return &converted
+}
+
+func (b *remoteBackend) current() (*control.Client, bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.client, b.online
+}
+
+func (b *remoteBackend) Settings() store.Settings {
+	client, _ := b.current()
+	return client.Settings()
+}
+
+func (b *remoteBackend) Path() string {
+	client, _ := b.current()
+	return client.Path()
+}
+
+func (b *remoteBackend) HasAccount() bool {
+	client, _ := b.current()
+	return client.HasAccount()
+}
+
+func (b *remoteBackend) ServiceMode() bool { return true }
+
+func (b *remoteBackend) Running() bool {
+	client, online := b.current()
+	return online && client.Running()
+}
+
+func (b *remoteBackend) Status() engine.Status {
+	client, _ := b.current()
+	return client.Status()
+}
+
+func (b *remoteBackend) Traffic() engine.Traffic {
+	client, _ := b.current()
+	return client.Traffic()
+}
+
+func (b *remoteBackend) Connect() {
+	if client, online := b.current(); online {
+		client.Connect()
+	}
+}
+
+func (b *remoteBackend) Disconnect() {
+	if client, online := b.current(); online {
+		client.Disconnect()
+	}
+}
+
+func (b *remoteBackend) DisconnectWait(timeout time.Duration) {
+	if client, online := b.current(); online {
+		client.DisconnectWait(timeout)
+	}
+}
+
+var errOffline = errors.New("служба ByeByeRKN недоступна")
+
+func (b *remoteBackend) ExportConfig() (string, error) {
+	if client, online := b.current(); online {
+		return client.ExportConfig()
+	}
+	return "", errOffline
+}
+
+func (b *remoteBackend) ApplyWarpPlus(key string) (string, error) {
+	if client, online := b.current(); online {
+		return client.ApplyWarpPlus(key)
+	}
+	return "", errOffline
+}
+
+func (b *remoteBackend) ForgetServer() error {
+	if client, online := b.current(); online {
+		return client.ForgetServer()
+	}
+	return errOffline
+}
+
+func (b *remoteBackend) ResetAccount() error {
+	if client, online := b.current(); online {
+		return client.ResetAccount()
+	}
+	return errOffline
+}
+
 func (b *remoteBackend) SetSettings(settings store.Settings) error {
-	return b.client.SetSettings(settings)
+	if client, online := b.current(); online {
+		return client.SetSettings(settings)
+	}
+	return errOffline
 }
 
 func (b *remoteBackend) SetHandlers(onStatus func(engine.Status), onTraffic func(engine.Traffic), onLog func(time.Time, string)) {
-	b.client.SetHandler(func(message control.Message) {
-		switch message.Type {
-		case control.MsgStatus:
-			if message.Status != nil {
-				onStatus(message.Status.Engine())
-			}
-		case control.MsgTraffic:
-			if message.Traffic != nil {
-				onTraffic(message.Traffic.Engine())
-			}
-		case control.MsgLog:
-			if message.Log != nil {
-				onLog(message.Log.At, message.Log.Text)
-			}
-		}
-	})
+	b.mu.Lock()
+	b.onStatus, b.onTraffic, b.onLog = onStatus, onTraffic, onLog
+	client := b.client
+	b.mu.Unlock()
+	client.SetHandler(b.dispatch)
 }
 
 func (b *remoteBackend) InitialLogs() []logLine {
-	lines := b.client.Logs()
+	client, _ := b.current()
+	lines := client.Logs()
 	out := make([]logLine, 0, len(lines))
 	for _, line := range lines {
 		out = append(out, logLine{at: line.At, text: line.Text})
@@ -147,7 +302,14 @@ func (b *remoteBackend) InitialLogs() []logLine {
 	return out
 }
 
-func (b *remoteBackend) Close() { b.client.Close() }
-
-// ErrNoService explains the missing pipe without leaking winio's wording into the dialog.
-var ErrNoService = errors.New("служба ByeByeRKN не установлена")
+func (b *remoteBackend) Close() {
+	b.mu.Lock()
+	if b.closed {
+		b.mu.Unlock()
+		return
+	}
+	b.closed = true
+	client := b.client
+	b.mu.Unlock()
+	client.Close()
+}

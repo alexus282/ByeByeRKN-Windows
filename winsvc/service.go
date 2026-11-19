@@ -3,6 +3,7 @@
 package winsvc
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,8 +12,9 @@ import (
 
 	"golang.org/x/sys/windows/svc"
 
-	"github.com/alexus282/ByeByeRKN/windows/control"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/catalog"
+	"github.com/alexus282/ByeByeRKN-Windows/control"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 // Run starts the service host. The SCM launches the exe with --service; a developer can run the
@@ -65,6 +67,11 @@ func start() (*running, error) {
 	if err != nil {
 		return nil, err
 	}
+	cache := catalog.CachePath(filepath.Dir(path))
+	catalog.LoadCache(cache)
+	// Endpoints move; a signed catalog from the repository updates the built-in list without a
+	// release. Offline or blocked GitHub leaves the cached or embedded list untouched.
+	go catalog.Refresh(context.Background(), cache)
 	st, err := store.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("настройки %s: %w", path, err)

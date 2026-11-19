@@ -13,8 +13,8 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
-	"github.com/alexus282/ByeByeRKN/windows/instance"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/instance"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 // Options are the choices the installer offers. The zero value installs to Program Files without
@@ -44,6 +44,9 @@ func Install(opts Options) (string, error) {
 		if _, err := os.Stat(file); err != nil {
 			return "", fmt.Errorf("нет файла %s: %w", file, err)
 		}
+	}
+	if dir == "" || filepath.Dir(dir) == dir {
+		return "", errors.New("выберите папку, а не корень диска")
 	}
 	target := ExeIn(dir)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -116,6 +119,11 @@ func Uninstall(removeData bool) error {
 	if removeData {
 		if err := os.RemoveAll(DataDir()); err != nil {
 			return err
+		}
+		// The installer copied (not moved) the portable settings; an uninstall that promises to
+		// forget the account must not leave that copy behind.
+		if userSettings, err := store.DefaultPath(); err == nil {
+			os.RemoveAll(filepath.Dir(userSettings))
 		}
 	}
 	removeShortcuts()
@@ -287,7 +295,7 @@ func writeUninstallEntry(version, exe, dir string) {
 	key.SetStringValue("DisplayIcon", exe+",0")
 	key.SetStringValue("UninstallString", `"`+exe+`" --uninstall`)
 	key.SetStringValue("QuietUninstallString", `"`+exe+`" --uninstall --quiet`)
-	key.SetStringValue("URLInfoAbout", "https://github.com/alexus282/ByeByeRKN")
+	key.SetStringValue("URLInfoAbout", "https://github.com/alexus282/ByeByeRKN-Windows")
 	key.SetDWordValue("NoModify", 1)
 	key.SetDWordValue("NoRepair", 1)
 }

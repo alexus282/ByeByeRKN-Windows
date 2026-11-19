@@ -21,11 +21,11 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"github.com/alexus282/ByeByeRKN/windows/install"
+	"github.com/alexus282/ByeByeRKN-Windows/install"
 )
 
 // version is set by build.ps1 from the Android app's versionName.
-var version = "dev"
+var version = "0.1.0"
 
 //go:embed payload
 var payload embed.FS
@@ -195,7 +195,7 @@ func (in *installer) payloadDir() (string, error) {
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || entry.Name() == ".keep" {
+		if entry.IsDir() || entry.Name() == ".keep" || entry.Name() == "placeholder.txt" {
 			return nil
 		}
 		data, err := payload.ReadFile(path)

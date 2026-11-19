@@ -1,6 +1,7 @@
 package install
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -22,6 +23,18 @@ func TestSamePathIgnoresCaseAndRelativeParts(t *testing.T) {
 func TestPowerShellPathEscaping(t *testing.T) {
 	if got := quotePowerShell(`C:\O'Brien\ByeByeRKN.exe`); got != `C:\O''Brien\ByeByeRKN.exe` {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestInstallRejectsDriveRootBeforeTouchingTheSystem(t *testing.T) {
+	source := t.TempDir()
+	for _, name := range []string{"ByeByeRKN.exe", "wintun.dll"} {
+		if err := os.WriteFile(filepath.Join(source, name), []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := Install(Options{Dir: `C:\`, SourceDir: source}); err == nil {
+		t.Fatal("installing into the drive root must be rejected")
 	}
 }
 

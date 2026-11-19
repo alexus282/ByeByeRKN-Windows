@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/catalog"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/catalog"
 )
 
 // Host is the WARP endpoint name; the catalog's addresses answer under it.

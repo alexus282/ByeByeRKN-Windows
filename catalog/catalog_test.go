@@ -16,16 +16,17 @@ import (
 	"testing"
 )
 
-// The Windows app embeds a copy of catalog/warp.json; it must not drift from the repository's.
-func TestEmbeddedCopyMatchesRepository(t *testing.T) {
-	repo, err := os.ReadFile("../../catalog/warp.json")
+// The embedded copy and its signature are kept next to the package, so the check works in the
+// standalone Windows repository as well as in the upstream monorepo.
+func TestEmbeddedCopyAndSignature(t *testing.T) {
+	repo, err := os.ReadFile("warp.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(repo, builtInJSON) {
-		t.Fatal("windows/catalog/warp.json differs from catalog/warp.json: copy it over")
+		t.Fatal("catalog/warp.json differs from the embedded copy")
 	}
-	sig, err := os.ReadFile("../../catalog/warp.json.sig")
+	sig, err := os.ReadFile("warp.json.sig")
 	if err != nil {
 		t.Fatal(err)
 	}

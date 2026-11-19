@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexus282/ByeByeRKN/windows/awg"
-	"github.com/alexus282/ByeByeRKN/windows/store"
-	"github.com/alexus282/ByeByeRKN/windows/warp"
-	"github.com/alexus282/ByeByeRKN/windows/wintunnel"
+	"github.com/alexus282/ByeByeRKN-Windows/awg"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/warp"
+	"github.com/alexus282/ByeByeRKN-Windows/wintunnel"
 )
 
 func testKey(fill byte) string {

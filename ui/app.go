@@ -11,7 +11,7 @@ import (
 	"gioui.org/io/system"
 	"gioui.org/op"
 
-	"github.com/alexus282/ByeByeRKN/windows/tray"
+	"github.com/alexus282/ByeByeRKN-Windows/tray"
 )
 
 const (
@@ -63,7 +63,12 @@ func Run(be Backend, show, quit <-chan struct{}) {
 		Menu:     s.menu,
 		OnSelect: s.selectMenu,
 		OnEndSession: func() {
-			// The service also handles shutdown, but a portable window owns the routes itself.
+			if be.ServiceMode() {
+				// The service has its own shutdown handler and is the one that owns the routes.
+				be.Disconnect()
+				return
+			}
+			// A portable window owns the routes itself and must remove them before logoff.
 			be.DisconnectWait(20 * time.Second)
 		},
 	}); err == nil {

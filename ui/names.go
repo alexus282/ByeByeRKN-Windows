@@ -1,6 +1,6 @@
 package ui
 
-import "github.com/alexus282/ByeByeRKN/windows/awg"
+import "github.com/alexus282/ByeByeRKN-Windows/awg"
 
 // maskNames are the Android app's titles and explanations of each disguise.
 var maskNames = map[awg.Mask]option{

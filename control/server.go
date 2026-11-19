@@ -13,8 +13,8 @@ import (
 
 	"github.com/Microsoft/go-winio"
 
-	"github.com/alexus282/ByeByeRKN/windows/engine"
-	"github.com/alexus282/ByeByeRKN/windows/store"
+	"github.com/alexus282/ByeByeRKN-Windows/engine"
+	"github.com/alexus282/ByeByeRKN-Windows/store"
 )
 
 const maxServerLogs = 500
