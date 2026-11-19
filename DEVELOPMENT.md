@@ -9,6 +9,9 @@ in [README.md](README.md).
   obfuscation presets and WARP registration.
 - Tunnel core: `github.com/amnezia-vpn/amneziawg-go`. The current branch uses v1.0.4; the v3.1 tags
   live under the separate `/v3` module path and are the next upgrade.
+- `catalog/warp.json` and `catalog/warp.json.sig` are copies from the Android repository. Update
+  both together; `.gitattributes` keeps LF line endings because the signature covers the exact
+  bytes. At runtime a newer signed copy is downloaded and cached in the app data directory.
 - UI: `gioui.org`, no CGO and no WebView2.
 - Go 1.26+ is required; `build.ps1` uses `go` from PATH, with the local dev path as a fallback.
 
