@@ -91,6 +91,7 @@ func start() (*running, error) {
 func runConsole() error {
 	r, err := start()
 	if err != nil {
+		logf("служба не запустилась: %v", err)
 		return err
 	}
 	fmt.Println("ByeByeRKN service is listening on", control.PipeName)

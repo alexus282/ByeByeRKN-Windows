@@ -131,7 +131,7 @@ func (in *installer) install() {
 	in.mu.Unlock()
 	in.win.Invalidate()
 
-	dir := strings.TrimSpace(in.dir.Text())
+	dir := normalizeDir(in.dir.Text())
 	startMenu, desktop, autostart, launch := in.startMenu, in.desktop, in.autostart, in.launch
 	go func() {
 		err := in.runInstall(dir, startMenu, desktop, autostart)
@@ -154,8 +154,7 @@ func (in *installer) install() {
 }
 
 func (in *installer) runInstall(dir string, startMenu, desktop, autostart bool) error {
-	dir = expandEnv(strings.Trim(strings.TrimSpace(dir), `"`))
-	dir = filepath.Clean(dir)
+	dir = normalizeDir(dir)
 	if dir == "" || !filepath.IsAbs(dir) {
 		return errPath
 	}
@@ -243,6 +242,12 @@ func (in *installer) close() {
 func (in *installer) runApp() {
 	_, _, _, dir, _ := in.state()
 	launchApp(filepath.Join(dir, "ByeByeRKN.exe"))
+}
+
+// normalizeDir makes the typed path comparable with what install.Install will use, so the done
+// page and the auto-launch button point at the real folder rather than at "%ProgramFiles%\...".
+func normalizeDir(path string) string {
+	return filepath.Clean(expandEnv(strings.Trim(strings.TrimSpace(path), `"`)))
 }
 
 // expandEnv accepts %ProgramFiles%-style variables, which is easier to type than a full path.

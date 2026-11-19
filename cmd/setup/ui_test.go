@@ -106,4 +106,7 @@ func TestExpandEnv(t *testing.T) {
 	if got := expandEnv(`C:\NoVariables`); got != `C:\NoVariables` {
 		t.Fatalf("got %q", got)
 	}
+	if got := normalizeDir(` "%BBR_SETUP_TEST%\ByeByeRKN" `); got != `D:\Apps\ByeByeRKN` {
+		t.Fatalf("normalizeDir got %q", got)
+	}
 }
